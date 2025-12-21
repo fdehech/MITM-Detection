@@ -2,6 +2,11 @@ services:
   server:
     build: ./server
     container_name: tcp_server
+    environment:
+      - SERVER_LISTEN_HOST=${SERVER_LISTEN_HOST}
+      - SERVER_LISTEN_PORT=${SERVER_LISTEN_PORT}
+      - SERVER_MAX_DELAY=${SERVER_MAX_DELAY}
+      - SERVER_BUFFER_SIZE=${SERVER_BUFFER_SIZE}
     ports:
       - "9001:9001"
     networks:
@@ -11,7 +16,13 @@ services:
     build: ./proxy
     container_name: tcp_proxy
     environment:
-      - MODE=transparent # transparent | modify | replay | delay
+      - PROXY_LISTEN_HOST=${PROXY_LISTEN_HOST}
+      - PROXY_LISTEN_PORT=${PROXY_LISTEN_PORT}
+      - PROXY_SERVER_HOST=${PROXY_SERVER_HOST}
+      - PROXY_SERVER_PORT=${PROXY_SERVER_PORT}
+      - PROXY_MODE=${PROXY_MODE}
+      - PROXY_DELAY_SECONDS=${PROXY_DELAY_SECONDS}
+      - PROXY_BUFFER_SIZE=${PROXY_BUFFER_SIZE}
     depends_on:
       - server
     ports:
@@ -22,6 +33,11 @@ services:
   client:
     build: ./client
     container_name: tcp_client
+    environment:
+      - CLIENT_PROXY_HOST=${CLIENT_PROXY_HOST}
+      - CLIENT_PROXY_PORT=${CLIENT_PROXY_PORT}
+      - CLIENT_MESSAGE_INTERVAL=${CLIENT_MESSAGE_INTERVAL}
+      - CLIENT_MESSAGE_PAYLOAD=${CLIENT_MESSAGE_PAYLOAD}
     depends_on:
       - proxy
     networks:
