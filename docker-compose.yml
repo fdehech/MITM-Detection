@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  server:
+    build: ./server
+    container_name: tcp_server
+    ports:
+      - "9001:9001"
+    networks:
+      - lab_net
+
+  proxy:
+    build: ./proxy
+    container_name: tcp_proxy
+    environment:
+      - MODE=transparent   # transparent | modify | replay | delay
+    depends_on:
+      - tcp_server
+    ports:
+      - "9000:9000"
+    networks:
+      - lab_net
+
+  client:
+    build: ./client
+    container_name: tcp_client
+    depends_on:
+      - proxy
+    networks:
+      - lab_net
+
+networks:
+  lab_net:
+    driver: bridge
