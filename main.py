@@ -161,6 +161,17 @@ async def scalar_html():
     return get_scalar_api_reference(
         openapi_url=app.openapi_url,
         title=app.title,
+        layout=Layout.CLASSIC,
+        theme=Theme.DEEP_SPACE,
+        hide_models=True,
+        hide_client_button=False,
+        show_sidebar=True,
+        hide_search=False,
+        hide_dark_mode_toggle=False,
+        with_default_fonts=True,
+        expand_all_model_sections=False,
+        expand_all_responses=False,
+        integration="fastapi"
     )
 
 @app.get("/config")
