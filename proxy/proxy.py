@@ -45,8 +45,6 @@ class MITMProxy:
             self.mode = AttackMode.TRANSPARENT
             logging.warning(f"Invalid mode '{mode}', defaulting to transparent")
         
-        # Reorder buffer for reorder mode
-        self.reorder_buffer = deque(maxlen=self.reorder_window)
         self.proxy_socket = None
         self._setup_logging()
 
@@ -58,7 +56,7 @@ class MITMProxy:
         )
         self.logger = logging.getLogger(__name__)
 
-    def _process_data(self, data):
+    def _process_data(self, data, buffer):
         """Process data according to the attack mode"""
         if self.mode == AttackMode.TRANSPARENT:
             return data
@@ -78,25 +76,29 @@ class MITMProxy:
 
         elif self.mode == AttackMode.REORDER:
             # Add packet to reorder buffer
-            self.reorder_buffer.append(data)
+            buffer.append(data)
             
             # If buffer is full, randomly select a packet to send
-            if len(self.reorder_buffer) >= self.reorder_window:
+            if len(buffer) >= self.reorder_window:
                 # Randomly select an index to send
-                index = random.randint(0, len(self.reorder_buffer) - 1)
-                packet = self.reorder_buffer[index]
-                del self.reorder_buffer[index]
-                self.logger.warning(f"MODE = Reorder → sending packet from position {index} (buffer size: {len(self.reorder_buffer)})")
+                index = random.randint(0, len(buffer) - 1)
+                packet = buffer[index]
+                # Remove by index (O(N) for deque but fine for small windows)
+                del buffer[index]
+                self.logger.warning(f"MODE = Reorder → sending packet from position {index} (buffer size: {len(buffer)})")
                 return packet
             else:
                 # Buffer not full yet, hold the packet
-                self.logger.info(f"MODE = Reorder → buffering packet (buffer: {len(self.reorder_buffer)}/{self.reorder_window})")
+                self.logger.info(f"MODE = Reorder → buffering packet (buffer: {len(buffer)}/{self.reorder_window})")
                 return None  # Signal to not send yet
 
         return data
 
     def _forward(self, source, destination, direction):
         """Forward data from source to destination with optional manipulation."""
+        # Create a local buffer for this direction if in reorder mode
+        buffer = deque(maxlen=self.reorder_window) if self.mode == AttackMode.REORDER else None
+        
         try:
             while True:
                 data = source.recv(self.buffer_size)
@@ -104,7 +106,7 @@ class MITMProxy:
                     break
                 
                 # Process data according to attack mode
-                processed = self._process_data(data)
+                processed = self._process_data(data, buffer)
                 
                 # If processed is None, packet is dropped or buffered
                 if processed is not None:
@@ -116,17 +118,23 @@ class MITMProxy:
 
         finally:
             # Flush reorder buffer if in reorder mode
-            if self.mode == AttackMode.REORDER and len(self.reorder_buffer) > 0:
-                self.logger.info(f"Flushing reorder buffer ({len(self.reorder_buffer)} packets)")
-                while self.reorder_buffer:
-                    packet = self.reorder_buffer.popleft()
+            if self.mode == AttackMode.REORDER and buffer and len(buffer) > 0:
+                self.logger.info(f"[{direction}] Flushing reorder buffer ({len(buffer)} packets)")
+                while buffer:
+                    packet = buffer.popleft()
                     try:
                         destination.sendall(packet)
                     except:
                         pass
             
-            source.close()
-            destination.close()
+            try:
+                source.close()
+            except:
+                pass
+            try:
+                destination.close()
+            except:
+                pass
 
     def _handle_connection(self, client_socket, client_addr):
         """Handle client connection by establishing server connection and forwarding data."""
@@ -159,7 +167,8 @@ class MITMProxy:
             server_to_client.join()
 
         except Exception as e:
-            self.logger.error(f"Error handling connection: {e}")
+            self.logger.error(f"Error handling connection from {client_addr}: {e}")
+        finally:
             client_socket.close()
 
     def run(self):
@@ -169,13 +178,20 @@ class MITMProxy:
             self.proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.proxy_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.proxy_socket.bind((self.proxy_host, self.proxy_port))
-            self.proxy_socket.listen(1)
+            self.proxy_socket.listen(5)
             self.logger.info(f"Proxy listening on {self.proxy_host}:{self.proxy_port}")
             self.logger.info(f"Running in MODE={self.mode.value}")
 
-            # Handle client connection
-            client_socket, client_addr = self.proxy_socket.accept()
-            self._handle_connection(client_socket, client_addr)
+            while True:
+                # Handle client connection
+                client_socket, client_addr = self.proxy_socket.accept()
+                # Handle each connection in a new thread to support multiple clients
+                client_thread = threading.Thread(
+                    target=self._handle_connection,
+                    args=(client_socket, client_addr),
+                    daemon=True
+                )
+                client_thread.start()
 
         except KeyboardInterrupt:
             self.logger.info("Proxy interrupted (Ctrl+C)")
@@ -185,6 +201,7 @@ class MITMProxy:
 
         finally:
             self.close()
+
 
     def close(self):
         """Close proxy socket."""
