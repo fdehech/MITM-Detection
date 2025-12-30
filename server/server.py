@@ -1,6 +1,6 @@
 """
-TCP Server
-Receives messages and detects potential MITM attacks
+Serveur TCP
+Reçoit les messages et détecte les attaques MITM
 """
 
 import socket
@@ -10,7 +10,7 @@ import os
 
 
 class Message:
-    # Message structuré avec numéro de séquence, timestamp et payload.
+    """ Message structuré avec numéro de séquence, timestamp et payload."""
     def __init__(self, sequence, timestamp, payload):
         self.sequence = sequence
         self.timestamp = timestamp
@@ -18,7 +18,7 @@ class Message:
 
 
 class DetectionServer:
-    # Serveur qui détecte les attaques MITM
+    """ Serveur qui détecte les attaques MITM """
     def __init__(self, host, port, max_delay, buffer_size):
         
         # Initialisation des attributs  
@@ -33,7 +33,7 @@ class DetectionServer:
         self._setup_logging()
 
     def _setup_logging(self):
-        # Configuration du logging
+        """ Configuration du logging """
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - [SERVER] - %(levelname)s - %(message)s" #Format des Logs
@@ -41,7 +41,8 @@ class DetectionServer:
         self.logger = logging.getLogger(__name__)
 
     def _parse_message(self, raw_message):
-        # Décomposition du message en format structuré
+
+        """ Décomposition du message en format structuré """
         parts = raw_message.split("|")
         fields = {}
 
@@ -56,8 +57,7 @@ class DetectionServer:
         )
 
     def _detect_dropped_packets(self, sequence):
-        
-        # Détection des paquets perdus
+        """ Détection des paquets perdus """
         
         if sequence > self.expected_sequence:
             # Gap detected - packets were dropped
@@ -76,7 +76,7 @@ class DetectionServer:
             return False
 
     def _detect_reorder_attack(self, sequence):
-        # Détection des paquets reordonnés
+        """ Détection des paquets reordonnés """
         if sequence < self.expected_sequence:
             self.logger.critical(
                 f"[ALERT] OUT-OF-ORDER PACKET: Received SEQ={sequence}, Expected SEQ={self.expected_sequence}"
@@ -98,7 +98,7 @@ class DetectionServer:
         return False
 
     def _detect_integrity_violation(self, raw_message):
-        # Détection des violations d'intégrité (Message qui ne respecte pas le format structuré attendu)
+        """ Détection des violations d'intégrité (Message qui ne respecte pas le format structuré attendu) """
         try:
             self._parse_message(raw_message)
             return False
@@ -109,7 +109,7 @@ class DetectionServer:
             return True
 
     def _process_message(self, raw_message):
-        # Algorithme de traitement et d'analyse des messages arrivés
+        """ Algorithme de traitement et d'analyse des messages arrivés"""
         if self._detect_integrity_violation(raw_message):
             return
         try:
@@ -140,7 +140,7 @@ class DetectionServer:
             self.logger.error(f"Error processing message: {e}")
 
     def _handle_client(self, client_socket, address):
-        # Gestion de la connexion et du traitement des messages
+        """ Gestion de la connexion et du traitement des messages """
         self.logger.info(f"Connected with {address}")
 
         try:
@@ -165,7 +165,7 @@ class DetectionServer:
             client_socket.close()
 
     def run(self):
-        # Démarrage du serveur de détection et écoute des connexions
+        """ Démarrage du serveur de détection et écoute des connexions """
         try:
             # Création et configuration du socket serveur
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -201,8 +201,7 @@ class DetectionServer:
 
 
 def main():
-
-    # Point d'entrée de l'application
+    """ Point d'entrée de l'application """
     
     # Lecture de la configuration des variables d'environnement
     host = os.getenv("SERVER_LISTEN_HOST", "0.0.0.0")

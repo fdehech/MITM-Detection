@@ -1,6 +1,6 @@
 """
-TCP Proxy for MITM Detection System
-Intercepts and manipulates traffic between client and server to simulate MITM attacks.
+Proxy TCP pour le système de détection MITM
+Intercepte et manipule le trafic entre le client et le serveur pour simuler des attaques MITM.
 """
 
 import socket
@@ -15,6 +15,7 @@ from collections import deque
 
 class AttackMode(Enum):
     """MITM attack simulation modes"""
+    
     TRANSPARENT = "transparent"  # Forward traffic without alteration
     RANDOM_DELAY = "random_delay"  # Delay packets by random duration
     DROP = "drop"  # Randomly drop packets
