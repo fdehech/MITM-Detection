@@ -79,10 +79,10 @@ def main():
     # Point d'entrée de l'application client
 
     # Lecture de la configuration des variables d'environnement
-    host = os.getenv("CLIENT_PROXY_HOST", "proxy") # Hôte du proxy
-    port = int(os.getenv("CLIENT_PROXY_PORT", "9000")) # Port du proxy
-    interval = float(os.getenv("CLIENT_MESSAGE_INTERVAL", "1.0")) # Intervalle entre les messages
-    payload = os.getenv("CLIENT_MESSAGE_PAYLOAD", "HELLO") # Payload des messages
+    host = os.getenv("CLIENT_PROXY_HOST") # Hôte du proxy
+    port = int(os.getenv("CLIENT_PROXY_PORT")) # Port du proxy
+    interval = float(os.getenv("CLIENT_MESSAGE_INTERVAL")) # Intervalle entre les messages
+    payload = os.getenv("CLIENT_MESSAGE_PAYLOAD") # Payload des messages
 
     # Création et lancement du client
     client = MessageClient(

@@ -204,10 +204,10 @@ def main():
     """ Point d'entrée de l'application """
     
     # Lecture de la configuration des variables d'environnement
-    host = os.getenv("SERVER_LISTEN_HOST", "0.0.0.0")
-    port = int(os.getenv("SERVER_LISTEN_PORT", "9001"))
-    max_delay = float(os.getenv("SERVER_MAX_DELAY", "2"))
-    buffer_size = int(os.getenv("SERVER_BUFFER_SIZE", "4096"))
+    host = os.getenv("SERVER_LISTEN_HOST")
+    port = int(os.getenv("SERVER_LISTEN_PORT"))
+    max_delay = float(os.getenv("SERVER_MAX_DELAY"))
+    buffer_size = int(os.getenv("SERVER_BUFFER_SIZE"))
 
     # Création et démarrage du serveur
     server = DetectionServer(host=host, port=port, max_delay=max_delay, buffer_size=buffer_size)

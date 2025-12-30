@@ -15,11 +15,10 @@ from collections import deque
 
 class AttackMode(Enum):
     """MITM attack simulation modes"""
-    
-    TRANSPARENT = "transparent"  # Forward traffic without alteration
-    RANDOM_DELAY = "random_delay"  # Delay packets by random duration
-    DROP = "drop"  # Randomly drop packets
-    REORDER = "reorder"  # Reorder packets within a buffer window
+    TRANSPARENT = "transparent"  # Redirige le traffic sans alteration
+    RANDOM_DELAY = "random_delay"  # Retarde les paquets par une durée aléatoire
+    DROP = "drop"  # Retire aléatoirement des paquets
+    REORDER = "reorder"  # Réorganise les paquets dans une fenêtre de tampon
 
 
 class MITMProxy:
@@ -34,7 +33,7 @@ class MITMProxy:
         self.server_port = server_port
         self.buffer_size = buffer_size
         
-        # Attack mode parameters
+        # Mode d'attaque
         self.delay_min = delay_min
         self.delay_max = delay_max
         self.drop_rate = drop_rate
@@ -50,7 +49,7 @@ class MITMProxy:
         self._setup_logging()
 
     def _setup_logging(self):
-        """Configure logging for the proxy"""
+        """Configuration du logging pour le proxy"""
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - [PROXY] - %(levelname)s - %(message)s"
@@ -58,7 +57,7 @@ class MITMProxy:
         self.logger = logging.getLogger(__name__)
 
     def _process_data(self, data, buffer):
-        """Process data according to the attack mode"""
+        """Traitement des données selon le mode d'attaque"""
         if self.mode == AttackMode.TRANSPARENT:
             return data
 
@@ -69,27 +68,27 @@ class MITMProxy:
             return data
 
         elif self.mode == AttackMode.DROP:
-            # Randomly drop packets based on drop_rate
+            # Retire aléatoirement des paquets selon drop_rate
             if random.random() < self.drop_rate:
                 self.logger.warning(f"MODE = Drop → packet DROPPED (drop_rate={self.drop_rate})")
                 return None  # Signal to drop this packet
             return data
 
         elif self.mode == AttackMode.REORDER:
-            # Add packet to reorder buffer
+            # Ajoute le paquet au tampon de reorganisation
             buffer.append(data)
             
-            # If buffer is full, randomly select a packet to send
+            # Si le tampon est plein, sélectionne aléatoirement un paquet à envoyer
             if len(buffer) >= self.reorder_window:
-                # Randomly select an index to send
+                # Sélectionne aléatoirement un index à envoyer
                 index = random.randint(0, len(buffer) - 1)
                 packet = buffer[index]
-                # Remove by index (O(N) for deque but fine for small windows)
+                # Supprime par index (O(N) pour deque mais bon pour des fenêtres petites)
                 del buffer[index]
                 self.logger.warning(f"MODE = Reorder → sending packet from position {index} (buffer size: {len(buffer)})")
                 return packet
             else:
-                # Buffer not full yet, hold the packet
+                # Tampon non plein encore, garde le paquet
                 self.logger.info(f"MODE = Reorder → buffering packet (buffer: {len(buffer)}/{self.reorder_window})")
                 return None  # Signal to not send yet
 
@@ -97,7 +96,7 @@ class MITMProxy:
 
     def _forward(self, source, destination, direction):
         """Forward data from source to destination with optional manipulation."""
-        # Create a local buffer for this direction if in reorder mode
+        # Créer un tampon local pour cette direction si en mode de reorganisation
         buffer = deque(maxlen=self.reorder_window) if self.mode == AttackMode.REORDER else None
         
         try:
@@ -106,10 +105,10 @@ class MITMProxy:
                 if not data:
                     break
                 
-                # Process data according to attack mode
+                # Traitement des données selon le mode d'attaque
                 processed = self._process_data(data, buffer)
                 
-                # If processed is None, packet is dropped or buffered
+                # Si processed est None, le paquet est retiré ou tamponné
                 if processed is not None:
                     destination.sendall(processed)
                     self.logger.info(f"{direction}: forwarded {len(processed)} bytes")
@@ -118,7 +117,7 @@ class MITMProxy:
             self.logger.info(f"{direction}: stopped ({e})")
 
         finally:
-            # Flush reorder buffer if in reorder mode
+            # Vider le tampon de reorganisation si en mode de reorganisation
             if self.mode == AttackMode.REORDER and buffer and len(buffer) > 0:
                 self.logger.info(f"[{direction}] Flushing reorder buffer ({len(buffer)} packets)")
                 while buffer:
@@ -138,16 +137,15 @@ class MITMProxy:
                 pass
 
     def _handle_connection(self, client_socket, client_addr):
-        """Handle client connection by establishing server connection and forwarding data."""
+        """Gestion de la connexion client en établissant une connexion serveur et en transférant les données."""
         self.logger.info(f"Client connected from {client_addr}")
-
         try:
-            # Connect to real server
+            # Connexion au serveur réel
             server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_socket.connect((self.server_host, self.server_port))
             self.logger.info(f"Connected to server at {self.server_host}:{self.server_port}")
 
-            # Create bidirectional forwarding threads
+            # Créer des threads bidirectionnels
             client_to_server = threading.Thread(
                 target=self._forward,
                 args=(client_socket, server_socket, "CLIENT → SERVER"),
@@ -159,11 +157,11 @@ class MITMProxy:
                 daemon=True
             )
 
-            # Start forwarding
+            # Démarre le transfert
             client_to_server.start()
             server_to_client.start()
 
-            # Wait for both threads to complete
+            # Attend que les deux threads soient terminés
             client_to_server.join()
             server_to_client.join()
 
@@ -173,9 +171,9 @@ class MITMProxy:
             client_socket.close()
 
     def run(self):
-        """Start proxy server and listen for connections."""
+        """Démarrer le serveur proxy et écouter les connexions."""
         try:
-            # Create and configure proxy socket
+            # Créer et configurer le socket proxy
             self.proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.proxy_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.proxy_socket.bind((self.proxy_host, self.proxy_port))
@@ -184,9 +182,9 @@ class MITMProxy:
             self.logger.info(f"Running in MODE={self.mode.value}")
 
             while True:
-                # Handle client connection
+                # Gestion de la connexion client
                 client_socket, client_addr = self.proxy_socket.accept()
-                # Handle each connection in a new thread to support multiple clients
+                # Gestion de chaque connexion dans un nouveau thread pour supporter plusieurs clients
                 client_thread = threading.Thread(
                     target=self._handle_connection,
                     args=(client_socket, client_addr),
@@ -205,35 +203,35 @@ class MITMProxy:
 
 
     def close(self):
-        """Close proxy socket."""
+        """Fermeture du socket proxy."""
         if self.proxy_socket:
             self.proxy_socket.close()
             self.logger.info("Proxy closed")
 
 
 def main():
-    """Application entry point."""
+    """Point d'entrée de l'application."""
     
-    # Read configuration from environment variables
-    proxy_host = os.getenv("PROXY_LISTEN_HOST", "0.0.0.0")
-    proxy_port = int(os.getenv("PROXY_LISTEN_PORT", "9000"))
-    server_host = os.getenv("PROXY_SERVER_HOST", "server")
-    server_port = int(os.getenv("PROXY_SERVER_PORT", "9001"))
-    mode = os.getenv("PROXY_MODE", "transparent")
+    # Lecture de la configuration des variables d'environnement
+    proxy_host = os.getenv("PROXY_LISTEN_HOST")
+    proxy_port = int(os.getenv("PROXY_LISTEN_PORT"))
+    server_host = os.getenv("PROXY_SERVER_HOST")
+    server_port = int(os.getenv("PROXY_SERVER_PORT"))
+    mode = os.getenv("PROXY_MODE")
     
-    # Random delay parameters
-    delay_min = float(os.getenv("PROXY_DELAY_MIN", "2.0"))
-    delay_max = float(os.getenv("PROXY_DELAY_MAX", "10.0"))
+    # Paramètres de délai aléatoire
+    delay_min = float(os.getenv("PROXY_DELAY_MIN"))
+    delay_max = float(os.getenv("PROXY_DELAY_MAX"))
     
-    # Drop mode parameters
-    drop_rate = float(os.getenv("PROXY_DROP_RATE", "0.3"))
+    # Paramètres de mode de perte
+    drop_rate = float(os.getenv("PROXY_DROP_RATE"))
     
-    # Reorder mode parameters
-    reorder_window = int(os.getenv("PROXY_REORDER_WINDOW", "5"))
+    # Paramètres de mode de reorganisation
+    reorder_window = int(os.getenv("PROXY_REORDER_WINDOW"))
     
-    buffer_size = int(os.getenv("PROXY_BUFFER_SIZE", "4096"))
+    buffer_size = int(os.getenv("PROXY_BUFFER_SIZE"))
 
-    # Create and run proxy
+    # Création et démarrage du proxy
     proxy = MITMProxy(
         proxy_host=proxy_host,
         proxy_port=proxy_port,
